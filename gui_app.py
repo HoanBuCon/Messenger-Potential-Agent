@@ -1,8 +1,10 @@
 import os
 import sys
 import io
+import re
 import time
 import threading
+import unicodedata
 import yaml
 import winsound
 from datetime import datetime
@@ -528,7 +530,6 @@ class MessengerAgentGUI(ctk.CTk):
 
     @staticmethod
     def _strip_accents(s: str) -> str:
-        import unicodedata
         nfkd = unicodedata.normalize('NFKD', s)
         return ''.join([c for c in nfkd if not unicodedata.combining(c)]).replace('đ', 'd').replace('Đ', 'D')
 
