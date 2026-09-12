@@ -1,6 +1,7 @@
 import json
+import re
 import threading
-from typing import Optional
+from typing import Optional, Callable
 from openai import OpenAI
 from db.mysql_client import MySQLClient
 from db.qdrant_client import QdrantMemoryClient
@@ -28,16 +29,36 @@ class MemoryWorker:
         self.client = openai_client
         self.model = model
 
-    def trigger_async_process(self, conversation_id: str, partner_message: str, bot_reply: str):
+    def trigger_async_process(
+        self,
+        conversation_id: str,
+        partner_message: str,
+        bot_reply: str,
+        on_log: Optional[Callable[[str], None]] = None,
+    ):
         """Kích hoạt luồng chạy ngầm không làm tắc nghẽn giao diện bot"""
         thread = threading.Thread(
             target=self._process_memory_turn,
-            args=(conversation_id, partner_message, bot_reply),
+            args=(conversation_id, partner_message, bot_reply, on_log),
             daemon=True
         )
         thread.start()
 
-    def _process_memory_turn(self, conversation_id: str, partner_message: str, bot_reply: str):
+    def _process_memory_turn(
+        self,
+        conversation_id: str,
+        partner_message: str,
+        bot_reply: str,
+        on_log: Optional[Callable[[str], None]] = None,
+    ):
+        def log(msg: str):
+            print(msg)
+            if on_log:
+                try:
+                    on_log(msg)
+                except Exception:
+                    pass
+
         try:
             prompt = f"""Bạn là chuyên gia trích xuất và quản lý bộ nhớ dài hạn cho AI.
 Hãy phân tích lượt trò chuyện sau:
@@ -65,20 +86,21 @@ Chỉ trả về JSON thuần túy, không kèm markdown hoặc giải thích th
             )
 
             content = response.choices[0].message.content.strip()
-            # Bỏ dấu bọc markdown json nếu có
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
 
-            if not content or content == "[]":
+            # Trích xuất mảng JSON an toàn bằng Regex
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            if json_match:
+                raw_json = json_match.group(0).strip()
+            else:
+                raw_json = content.replace("```json", "").replace("```", "").strip()
+
+            if not raw_json or raw_json == "[]":
+                log("[Memory Worker] Không có sự thật mới cần lưu trữ.")
                 return
 
-            facts_list = json.loads(content)
-            if not isinstance(facts_list, list):
+            facts_list = json.loads(raw_json)
+            if not isinstance(facts_list, list) or not facts_list:
+                log("[Memory Worker] Không phát hiện sự thật hợp lệ.")
                 return
 
             for item in facts_list:
@@ -105,7 +127,7 @@ Chỉ trả về JSON thuần túy, không kèm markdown hoặc giải thích th
                     old_id = old_mem.get("memory_id")
                     if old_id:
                         supersedes_id = old_id
-                        print(f"[MEMORY WORKER] Phát hiện cập nhật/xung đột! Memory cũ id={old_id}: '{old_mem.get('fact')}'")
+                        log(f"[Memory Worker] ⚡ Phát hiện cập nhật/xung đột! Memory cũ #{old_id}: '{old_mem.get('fact')}' -> Đã chuyển sang superseded.")
                         # Cập nhật MySQL
                         self.mysql.update_memory_status(old_id, status="superseded")
                         # Cập nhật Qdrant
@@ -128,7 +150,8 @@ Chỉ trả về JSON thuần túy, không kèm markdown hoặc giải thích th
                         fact=fact,
                         status="active"
                     )
-                    print(f"[MEMORY WORKER] ✓ Đã lưu memory mới id={new_id}: [{topic}] '{fact}'")
+                    log(f"[Memory Worker] ✓ Đã lưu Fact mới #{new_id}: [{topic}] '{fact}'")
 
         except Exception as e:
-            print(f"[MEMORY WORKER ERROR] Lỗi khi xử lý trích xuất memory ngầm: {e}")
+            err_msg = f"[Memory Worker ERROR] Lỗi khi xử lý trích xuất memory ngầm: {e}"
+            log(err_msg)

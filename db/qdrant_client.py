@@ -132,13 +132,23 @@ class QdrantMemoryClient:
                     )
                 ]
             )
-            hits = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_vector,
-                query_filter=query_filter,
-                limit=limit,
-                score_threshold=score_threshold
-            )
+            if hasattr(self.client, "query_points"):
+                res = self.client.query_points(
+                    collection_name=self.collection_name,
+                    query=query_vector,
+                    query_filter=query_filter,
+                    limit=limit,
+                    score_threshold=score_threshold
+                )
+                hits = res.points
+            else:
+                hits = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=query_vector,
+                    query_filter=query_filter,
+                    limit=limit,
+                    score_threshold=score_threshold
+                )
             results = []
             for hit in hits:
                 results.append({

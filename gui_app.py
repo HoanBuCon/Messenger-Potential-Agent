@@ -734,10 +734,20 @@ class MessengerAgentGUI(ctk.CTk):
     def trigger_async_worker(self, conv_id: str, incoming: str, reply: str):
         def worker():
             self.after(0, self.lbl_worker_status.configure, {"text": "Đang phân tích bóc tách sự thật ngầm..."})
-            self.memory_worker._process_memory_turn(conv_id, incoming, reply)
+            self.after(0, self.log, "[Memory Worker] Bắt đầu phân tích bóc tách sự thật ngầm...")
+
+            def on_log_cb(msg: str):
+                self.after(0, self.log, msg)
+
+            self.memory_worker._process_memory_turn(conv_id, incoming, reply, on_log=on_log_cb)
             active_mems = self.mysql.get_active_memories(conv_id)
             status_summary = f"Đã đồng bộ MySQL & Qdrant ({len(active_mems)} facts đang có hiệu lực)."
             self.after(0, self.lbl_worker_status.configure, {"text": status_summary})
+
+            # Tự động cập nhật hiển thị Memories trên Dashboard
+            if active_mems:
+                mem_display = "\n".join([f"• [{m.get('topic')}] {m.get('fact')}" for m in active_mems[-5:]])
+                self.after(0, self.lbl_memories.configure, {"text": mem_display})
 
         threading.Thread(target=worker, daemon=True).start()
 
