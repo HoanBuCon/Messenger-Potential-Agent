@@ -1,11 +1,11 @@
 chat_region:
-  height: 1338
-  left: 3113
-  top: 166
-  width: 1314
+  height: 1207
+  left: 3137
+  top: 191
+  width: 1251
 conversation:
-  id: conv_bing_chilling
-  partner_name: Bing Chilling
+  id: conv_mingking
+  partner_name: MingKing
 database:
   mysql:
     database: messenger_bot
@@ -21,12 +21,12 @@ detection:
   confidence_threshold: 0.6
   diff_threshold: 0.01
 input_box:
-  height: 29
-  left: 3386
-  top: 1416
-  width: 910
-  x: 3841
-  y: 1430
+  height: 30
+  left: 3385
+  top: 1414
+  width: 900
+  x: 3835
+  y: 1429
 layout:
   incoming_x_ratio_max: 0.45
 llm:
@@ -114,8 +114,8 @@ llm:
     các từ viết tắt, tiếng lóng, gõ trượt phím hoặc OCR nhận diện dính chữ phổ biến
     trên Messenger (ví dụ: "da tra ldi" -> đã trả lời, "mqi ngudi" -> mọi người, "char"
     -> nhân vật, "all" -> tất cả). + Phản hồi thông minh, đúng trọng tâm câu chuyện
-    nhóm đang bàn; giữ phong thái Kuudere
-    sắc sảo, điềm tĩnh và luôn duy trì sự ưu tiên, thấu hiểu dành cho Senpai.
+    nhóm đang bàn; giữ phong thái Kuudere sắc sảo, điềm tĩnh và luôn duy trì sự ưu
+    tiên, thấu hiểu dành cho Senpai.
 
 
     [SECURITY RULES]
