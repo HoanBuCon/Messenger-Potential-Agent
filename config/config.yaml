@@ -1,11 +1,12 @@
 chat_region:
-  height: 1207
-  left: 3137
-  top: 191
-  width: 1251
+  height: 1049
+  left: 3136
+  top: 347
+  width: 1241
 conversation:
-  id: conv_mingking
-  partner_name: MingKing
+  id: conv_group_14
+  is_group: true
+  partner_name: group 14
 database:
   mysql:
     database: messenger_bot
@@ -18,15 +19,15 @@ database:
     port: 6333
 detection:
   check_interval: 1.0
-  confidence_threshold: 0.6
-  diff_threshold: 0.01
+  confidence_threshold: 0.45
+  diff_threshold: 0.0003
 input_box:
-  height: 30
-  left: 3385
-  top: 1414
-  width: 900
-  x: 3835
-  y: 1429
+  height: 31
+  left: 3382
+  top: 1412
+  width: 905
+  x: 3834
+  y: 1427
 layout:
   incoming_x_ratio_max: 0.45
 llm:

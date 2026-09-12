@@ -112,9 +112,11 @@ class ScreenCapturer:
         _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
         non_zero_count = cv2.countNonZero(thresh)
         total_pixels = current_gray.shape[0] * current_gray.shape[1]
-        diff_ratio = non_zero_count / float(total_pixels)
+        diff_ratio = non_zero_count / float(total_pixels) if total_pixels > 0 else 0.0
 
-        is_changed = diff_ratio >= self.diff_threshold
+        # Nhạy bén: Phát hiện sự xuất hiện của tin nhắn mới kể cả câu ngắn 1-2 từ (>= 100 pixels)
+        # hoặc diff_ratio vượt ngưỡng cấu hình
+        is_changed = (non_zero_count >= 100) or (diff_ratio >= self.diff_threshold)
         if is_changed:
             self.last_gray_frame = current_gray
 

@@ -82,18 +82,35 @@ class LLMAgent:
             if (reply.startswith('"') and reply.endswith('"')) or (reply.startswith("'") and reply.endswith("'")):
                 reply = reply[1:-1].strip()
 
-            return self._sanitize_opening(reply, partner_title)
+            incoming_sender = latest_message.split("\n")[0].strip() if is_group and "\n" in latest_message else None
+            return self._sanitize_opening(reply, partner_title=partner_title, incoming_sender=incoming_sender)
         except Exception as e:
             print(f"[LỖI LLM] Không thể gọi DeepSeek API: {e}")
             return None
 
-    def _sanitize_opening(self, reply: str, partner_title: Optional[str] = None) -> str:
+    def _sanitize_opening(
+        self,
+        reply: str,
+        partner_title: Optional[str] = None,
+        incoming_sender: Optional[str] = None
+    ) -> str:
         """
         Lọc bỏ linh hoạt các thói quen mở đầu bằng thán từ chào hỏi lặp lại,
-        tự động thích ứng theo danh xưng / tên đối phương mà không hardcode cố định.
+        và loại bỏ tên thành viên bị chèn nhầm vào dòng đầu tiên trong group chat.
         """
         if not reply:
             return reply
+
+        # 1. Lọc bỏ nếu bot lỡ copy tên thành viên vào dòng đầu tiên (ví dụ: "Thiên Tài Ngáo Đá\n...")
+        if "\n" in reply:
+            parts = reply.split("\n", 1)
+            first_line = parts[0].strip().strip("[]:")
+            rest = parts[1].strip()
+            if rest:
+                if incoming_sender and first_line.lower() == incoming_sender.lower():
+                    reply = rest
+                elif partner_title and first_line.lower() == partner_title.lower():
+                    reply = rest
 
         titles = ["Senpai"]
         if partner_title and partner_title.strip():

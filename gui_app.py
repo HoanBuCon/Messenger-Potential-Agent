@@ -5,6 +5,7 @@ import re
 import time
 import threading
 import unicodedata
+import difflib
 import yaml
 import winsound
 from datetime import datetime
@@ -589,39 +590,42 @@ class MessengerAgentGUI(ctk.CTk):
 
     def is_bot_self_echo(self, text: str) -> bool:
         """
-        Kiểm tra chặt chẽ xem tin nhắn vừa OCR có phải là tin nhắn chính bot vừa gửi không
-        (chống tự đọc lại lời mình kể cả khi OCR bị rụng dấu, ngắt dòng đuôi hoặc dính lỗi telex).
+        Kiểm tra xem tin nhắn đối phương có phải là do OCR nhận nhầm bong bóng của chính bot không.
+        Chỉ coi là self-echo nếu nội dung gần như trùng khớp hoàn toàn (>= 80% similarity)
+        với một trong các tin nhắn gần nhất mà bot vừa gửi.
+        Tuyệt đối không bắt nhầm các câu trả lời ngắn của đối phương (ví dụ: 'Có', 'Ủa', 'Ok', 'Tôi đói').
         """
-        cleaned = text.strip().lower()
-        if not cleaned:
-            return True
+        if not text or not self.recently_sent_replies:
+            return False
 
-        clean_norm = self._strip_accents(cleaned)
-        clean_words = [w for w in re.sub(r'[^\w\s]', ' ', clean_norm).split() if len(w) > 0]
+        clean_text = self._strip_accents(text.strip().lower())
+        clean_words = [w for w in re.sub(r'[^\w\s]', ' ', clean_text).split() if w]
         if not clean_words:
             return True
 
-        clean_norm_str = " ".join(clean_words)
+        # Chỉ so sánh với 3 tin nhắn mới nhất bot vừa gửi
+        for sent in self.recently_sent_replies[-3:]:
+            sent_clean = self._strip_accents(sent.strip().lower())
+            sent_words = [w for w in re.sub(r'[^\w\s]', ' ', sent_clean).split() if w]
+            if not sent_words:
+                continue
 
-        for sent in self.recently_sent_replies[-10:]:
-            s = sent.strip().lower()
-            sent_norm = self._strip_accents(s)
-            sent_words = [w for w in re.sub(r'[^\w\s]', ' ', sent_norm).split() if len(w) > 0]
-            sent_norm_str = " ".join(sent_words)
-
-            # 1. So khớp trực tiếp có dấu hoặc không dấu
-            if cleaned == s or clean_norm_str == sent_norm_str:
+            # 1. Trùng khớp hoàn toàn (exact match)
+            if clean_text == sent_clean:
                 return True
 
-            # 2. So khớp substring (đặc biệt bắt trọn các dòng đuôi ngắn do OCR cắt ra)
-            if clean_norm_str in sent_norm_str or sent_norm_str in clean_norm_str:
+            # 2. Nếu tin nhắn OCR rất ngắn (dưới 4 từ), TUYỆT ĐỐI KHÔNG coi là self-echo
+            # trừ khi trùng khớp 100% với tin bot gửi (đã kiểm tra ở bước 1)
+            if len(clean_words) < 4:
+                continue
+
+            # 3. Tính độ tương đồng SequenceMatcher
+            ratio = difflib.SequenceMatcher(None, clean_text, sent_clean).ratio()
+            if ratio >= 0.80:
                 return True
 
-            # 3. So khớp từ trùng lặp
-            overlap = sum(1 for w in clean_words if w in sent_words)
-            if len(clean_words) <= 2 and overlap == len(clean_words):
-                return True
-            if len(clean_words) > 2 and (overlap / len(clean_words)) >= 0.50:
+            # 4. Nếu toàn bộ câu OCR trùng khớp một đoạn lớn (>= 80% độ dài tin OCR và tối thiểu 20 ký tự)
+            if len(clean_text) >= 20 and clean_text in sent_clean:
                 return True
 
         return False

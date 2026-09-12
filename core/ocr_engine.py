@@ -89,12 +89,13 @@ class OCREngine:
                 if box_w < 6 or box_h < 6:
                     continue
 
-                # Cắt ảnh có bù thêm viền (padding 2px) để không bị xén mất dấu mũ/dấu hỏi/nặng
-                pad = 2
-                crop_x1 = max(0, int(min_x - pad))
-                crop_y1 = max(0, int(min_y - pad))
-                crop_x2 = min(w_img, int(max_x + pad))
-                crop_y2 = min(h_img, int(max_y + pad))
+                # Cắt ảnh có bù thêm viền (pad_x=3, pad_y=4) để không bị xén mất dấu mũ/dấu hỏi/nặng
+                pad_x = 3
+                pad_y = 4
+                crop_x1 = max(0, int(min_x - pad_x))
+                crop_y1 = max(0, int(min_y - pad_y))
+                crop_x2 = min(w_img, int(max_x + pad_x))
+                crop_y2 = min(h_img, int(max_y + pad_y))
 
                 crop_bgr = img_bgr[crop_y1:crop_y2, crop_x1:crop_x2]
                 if crop_bgr.size == 0:
