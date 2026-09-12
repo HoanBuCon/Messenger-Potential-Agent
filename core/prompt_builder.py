@@ -17,9 +17,26 @@ class PromptBuilder:
         memories: List[Dict[str, Any]],
         recent_history: Optional[List[Dict[str, Any]]],
         latest_incoming: str,
+        is_group: bool = False,
     ) -> List[Dict[str, str]]:
         # 1. System message với Persona và Ký ức được nạp từ Qdrant
         system_content = system_persona.strip()
+
+        # Bổ sung prompt bối cảnh nhóm CHỈ KHI chế độ Group Chat được bật
+        if is_group:
+            group_instruction = (
+                "\n\n[BỐI CẢNH GROUP CHAT (NHÓM NHIỀU THÀNH VIÊN)]:\n"
+                "- Cuộc trò chuyện này đang diễn ra trong một NHÓM CHAT nhiều người trên Messenger.\n"
+                "- Cấu trúc tin nhắn của thành viên nhóm thường gồm:\n"
+                "  + Dòng đầu tiên: Tên hiển thị (nickname) của thành viên phát ngôn.\n"
+                "  + Các dòng tiếp theo: Nội dung tin nhắn mà thành viên đó gửi.\n"
+                "- Quy tắc ứng xử trong nhóm:\n"
+                "  1. Phân biệt người nói và nội dung: Dòng đầu tiên là danh tính người phát ngôn, KHÔNG PHẢI nội dung tin nhắn, KHÔNG PHẢI chủ đề thảo luận hay tên công cụ/phần mềm.\n"
+                "  2. Đối tượng giao tiếp: Các thành viên trong nhóm đều là Senpai của em.\n"
+                "  3. Cách xưng hô: Có thể gọi các thành viên khác bằng 'Senpai' hoặc tên hiển thị của họ và xưng là 'em'.\n"
+                "  4. Phản hồi đúng trọng tâm câu hỏi hoặc ý kiến của thành viên đó."
+            )
+            system_content += group_instruction
 
         if memories:
             memory_lines = []

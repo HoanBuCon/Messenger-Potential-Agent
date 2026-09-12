@@ -28,6 +28,7 @@ class MessageParser:
         r".*(doan chat nay|đoạn chat này).*(doc, nghe|đọc, nghe|chia se|chia sẻ).*",
         r".*(cac ban c.* the goi va nhan tin|các bạn có thể gọi và nhắn tin|thoi diem doc tin nhan|thời điểm đọc tin nhắn).*",
         r".*(Ban da tao nhom|Bạn đã tạo nhóm).*",
+        r".*(đã trả lời|da tra loi).*",
     ]
 
     def __init__(self, incoming_x_ratio_max: float = 0.45):
@@ -128,7 +129,7 @@ class MessageParser:
                 else:
                     merged_messages.append({
                         "sender": current_msg["sender"],
-                        "text": " ".join(current_msg["texts"]),
+                        "text": "\n".join(current_msg["texts"]).strip(),
                         "min_y": current_msg["min_y"],
                         "max_y": current_msg["max_y"],
                     })
@@ -144,7 +145,7 @@ class MessageParser:
         if current_msg is not None:
             merged_messages.append({
                 "sender": current_msg["sender"],
-                "text": " ".join(current_msg["texts"]),
+                "text": "\n".join(current_msg["texts"]).strip(),
                 "min_y": current_msg["min_y"],
                 "max_y": current_msg["max_y"],
             })

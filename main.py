@@ -165,7 +165,9 @@ def main():
                         reply = llm_agent.generate_reply(
                             latest_message=latest_incoming,
                             memories=relevant_memories,
-                            recent_history=recent_history
+                            recent_history=recent_history,
+                            partner_title=config.get("conversation", {}).get("partner_name", "Senpai"),
+                            is_group=bool(config.get("conversation", {}).get("is_group", False))
                         )
 
                         if reply:

@@ -51,6 +51,7 @@ class LLMAgent:
         memories: Optional[List[Dict[str, Any]]] = None,
         recent_history: Optional[List[Dict[str, Any]]] = None,
         partner_title: Optional[str] = None,
+        is_group: bool = False,
     ) -> Optional[str]:
         """
         Sinh câu trả lời từ tin nhắn mới nhất, kết hợp Memory nạp từ Qdrant
@@ -64,7 +65,8 @@ class LLMAgent:
             system_persona=self.system_prompt,
             memories=memories or [],
             recent_history=recent_history,
-            latest_incoming=latest_message
+            latest_incoming=latest_message,
+            is_group=is_group,
         )
 
         try:

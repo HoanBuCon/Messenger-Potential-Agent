@@ -114,17 +114,21 @@ class ConversationDialog:
             name = c.get("partner_name", "Không rõ")
             msgs = c.get("msg_count", 0)
             mems = c.get("mem_count", 0)
-            label = f"{name}  [{cid}] - ({msgs} tin, {mems} ký ức)"
+            is_grp = bool(c.get("is_group", False))
+            grp_badge = " [Group]" if is_grp else ""
+            label = f"{name}{grp_badge}  [{cid}] - ({msgs} tin, {mems} ký ức)"
             conv_display_list.append(label)
-            self.conv_map[label] = {"id": cid, "name": name}
+            self.conv_map[label] = {"id": cid, "name": name, "is_group": is_grp}
 
         # Đọc config hiện tại để chọn mặc định
         current_cid = "conv_senpai"
+        current_is_group = False
         if os.path.exists(CONFIG_PATH):
             try:
                 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                     cfg = yaml.safe_load(f) or {}
                     current_cid = cfg.get("conversation", {}).get("id", "conv_senpai")
+                    current_is_group = bool(cfg.get("conversation", {}).get("is_group", False))
             except Exception:
                 pass
 
@@ -132,6 +136,7 @@ class ConversationDialog:
         for label, val in self.conv_map.items():
             if val["id"] == current_cid:
                 default_select = label
+                current_is_group = val["is_group"]
                 break
 
         self.combo_conv = ttk.Combobox(content, values=conv_display_list, width=50, state="readonly")
@@ -141,6 +146,7 @@ class ConversationDialog:
             self.combo_conv.set("Chưa có cuộc hội thoại nào trong CSDL")
             self.choice_var.set("new")  # Nếu chưa có thì chuyển sang tạo mới
         self.combo_conv.pack(anchor="w", padx=25, pady=(0, 15))
+        self.combo_conv.bind("<<ComboboxSelected>>", self._on_combo_selected)
 
         # ================= OPTION 2: TẠO CUỘC HỘI THOẠI MỚI =================
         r2 = tk.Radiobutton(
@@ -159,9 +165,9 @@ class ConversationDialog:
         r2.pack(anchor="w", pady=(5, 5))
 
         new_frame = tk.Frame(content, bg="#1e293b", padx=15, pady=10)
-        new_frame.pack(fill="x", padx=20, pady=(0, 15))
+        new_frame.pack(fill="x", padx=20, pady=(0, 10))
 
-        tk.Label(new_frame, text="Tên người nhắn / Biệt danh:", font=("Segoe UI", 9), fg="#94a3b8", bg="#1e293b").pack(anchor="w")
+        tk.Label(new_frame, text="Tên người nhắn / Tên nhóm:", font=("Segoe UI", 9), fg="#94a3b8", bg="#1e293b").pack(anchor="w")
         self.entry_name = tk.Entry(new_frame, font=("Segoe UI", 10), bg="#0f172a", fg="#ffffff", insertbackground="white")
         self.entry_name.pack(fill="x", pady=(2, 8))
         self.entry_name.insert(0, "Senpai")
@@ -171,6 +177,21 @@ class ConversationDialog:
         self.entry_id = tk.Entry(new_frame, font=("Segoe UI", 10), bg="#0f172a", fg="#38bdf8", insertbackground="white")
         self.entry_id.pack(fill="x", pady=(2, 2))
         self.entry_id.insert(0, "conv_senpai")
+
+        # ================= CHẾ ĐỘ GROUP CHAT =================
+        self.is_group_var = tk.BooleanVar(value=current_is_group)
+        self.chk_group = tk.Checkbutton(
+            content,
+            text="👥 Đây là nhóm chat nhiều thành viên (Group Chat Mode)",
+            variable=self.is_group_var,
+            font=("Segoe UI", 10, "bold"),
+            fg="#c084fc",
+            bg="#0f172a",
+            selectcolor="#1e293b",
+            activebackground="#0f172a",
+            activeforeground="#c084fc"
+        )
+        self.chk_group.pack(anchor="w", padx=20, pady=(5, 10))
 
         # Nút xác nhận
         btn_frame = tk.Frame(self.root, bg="#0f172a", pady=10)
@@ -194,6 +215,11 @@ class ConversationDialog:
 
         self._on_choice_changed()
 
+    def _on_combo_selected(self, event=None):
+        selected_label = self.combo_conv.get()
+        if selected_label in self.conv_map:
+            self.is_group_var.set(self.conv_map[selected_label].get("is_group", False))
+
     def _auto_update_id(self, event=None):
         """Tự động sinh ID theo tên người dùng nhập"""
         name = self.entry_name.get().strip()
@@ -206,6 +232,7 @@ class ConversationDialog:
             self.combo_conv.config(state="readonly")
             self.entry_name.config(state="disabled")
             self.entry_id.config(state="disabled")
+            self._on_combo_selected()
         else:
             self.combo_conv.config(state="disabled")
             self.entry_name.config(state="normal")
@@ -213,6 +240,7 @@ class ConversationDialog:
 
     def _on_confirm(self):
         mode = self.choice_var.get()
+        is_group = bool(self.is_group_var.get())
 
         if mode == "existing":
             selected_label = self.combo_conv.get()
@@ -232,7 +260,7 @@ class ConversationDialog:
 
         # Lưu thông tin vào MySQL
         try:
-            self.mysql.ensure_conversation(conv_id, partner_name)
+            self.mysql.ensure_conversation(conv_id, partner_name, is_group=is_group)
         except Exception as e:
             print(f"[MySQL Error] {e}")
 
@@ -247,14 +275,15 @@ class ConversationDialog:
 
         config["conversation"] = {
             "id": conv_id,
-            "partner_name": partner_name
+            "partner_name": partner_name,
+            "is_group": is_group
         }
 
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
 
-        self.result = {"id": conv_id, "partner_name": partner_name}
-        print(f"[✓] Đã thiết lập cuộc hội thoại hiện tại: [{conv_id}] {partner_name}")
+        self.result = {"id": conv_id, "partner_name": partner_name, "is_group": is_group}
+        print(f"[✓] Đã thiết lập cuộc hội thoại hiện tại: [{conv_id}] {partner_name} (is_group={is_group})")
 
         self.root.destroy()
 

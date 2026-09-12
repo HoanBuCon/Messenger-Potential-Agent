@@ -96,6 +96,7 @@ class MessengerAgentGUI(ctk.CTk):
         self.approval_event = threading.Event()
         self.current_pending_reply = None
         self.action_decision = "send"  # "send", "regenerate", "skip"
+        self.is_group_chat = bool(self.config.get("conversation", {}).get("is_group", False))
 
         self.latest_ocr_text = "Chưa có dữ liệu"
         self.latest_memories_text = "Chưa có dữ liệu"
@@ -198,9 +199,10 @@ class MessengerAgentGUI(ctk.CTk):
         conv_frame = ctk.CTkFrame(header, fg_color="#222631", corner_radius=8)
         conv_frame.pack(side="left", padx=15, pady=10)
 
+        grp_tag = " [Group]" if self.is_group_chat else ""
         self.lbl_current_conv = ctk.CTkLabel(
             conv_frame,
-            text=f"🏷️ [{conv_info.get('id')}] {conv_info.get('partner_name')}",
+            text=f"🏷️ [{conv_info.get('id')}] {conv_info.get('partner_name')}{grp_tag}",
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#38bdf8"
         )
@@ -217,6 +219,24 @@ class MessengerAgentGUI(ctk.CTk):
             height=26
         )
         self.btn_change_conv.pack(side="left", padx=(0, 6), pady=4)
+
+        # Group Chat Mode Switch
+        group_frame = ctk.CTkFrame(header, fg_color="#222631", corner_radius=8)
+        group_frame.pack(side="left", padx=(0, 10), pady=10)
+
+        self.switch_group_chat = ctk.CTkSwitch(
+            group_frame,
+            text="👥 Group Chat",
+            command=self.on_toggle_group_chat,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#c084fc",
+            progress_color="#8b5cf6",
+        )
+        if self.is_group_chat:
+            self.switch_group_chat.select()
+        else:
+            self.switch_group_chat.deselect()
+        self.switch_group_chat.pack(side="left", padx=10, pady=4)
 
         # Control Buttons
         self.btn_toggle_bot = ctk.CTkButton(
@@ -454,6 +474,40 @@ class MessengerAgentGUI(ctk.CTk):
             self.lbl_hitl_badge.configure(text="FULL-AUTO (TỰ ĐỘNG GỬI)", fg_color="#10b981")
             self.log("Đã chuyển sang chế độ: Tự động hoàn toàn (Full-Auto).")
 
+    def on_toggle_group_chat(self):
+        """Xử lý khi người dùng bật / tắt công tắc Group Chat trên thanh Header"""
+        is_active = bool(self.switch_group_chat.get())
+        self.is_group_chat = is_active
+        if "conversation" not in self.config:
+            self.config["conversation"] = {}
+        self.config["conversation"]["is_group"] = is_active
+
+        # 1. Lưu trạng thái vào config.yaml
+        try:
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                yaml.dump(self.config, f, allow_unicode=True, default_flow_style=False)
+        except Exception as e:
+            self.log(f"[Lỗi lưu cấu hình] {e}")
+
+        # 2. Đồng bộ trạng thái vào MySQL
+        try:
+            cid = self.config["conversation"].get("id")
+            if cid:
+                self.mysql.update_conversation_group(cid, is_active)
+        except Exception:
+            pass
+
+        # 3. Cập nhật nhãn hiển thị hội thoại hiện tại
+        cid = self.config["conversation"].get("id", "conv_senpai")
+        name = self.config["conversation"].get("partner_name", "Senpai")
+        grp_tag = " [Group]" if self.is_group_chat else ""
+        self.lbl_current_conv.configure(text=f"🏷️ [{cid}] {name}{grp_tag}")
+
+        if is_active:
+            self.log("👥 [Chế độ] Đã BẬT Group Chat. Prompt xử lý thành viên nhóm & tên người gửi đã được kích hoạt.")
+        else:
+            self.log("👤 [Chế độ] Đã TẮT Group Chat. Trở về chế độ trò chuyện 1-1 thông thường với Senpai.")
+
     # =========================================================================
     # ĐIỀU KHIỂN CHẠY BOT (BACKGROUND WORKER THREAD)
     # =========================================================================
@@ -629,7 +683,8 @@ class MessengerAgentGUI(ctk.CTk):
                                 latest_message=latest_incoming,
                                 memories=relevant_memories,
                                 recent_history=recent_history,
-                                partner_title=partner_name
+                                partner_title=partner_name,
+                                is_group=self.is_group_chat
                             )
                             if not reply:
                                 self.after(0, self.log, "Lỗi: DeepSeek không sinh được câu trả lời.")
@@ -719,7 +774,8 @@ class MessengerAgentGUI(ctk.CTk):
             latest_message=ocr_text,
             memories=relevant_memories,
             recent_history=recent_history,
-            partner_title=partner_name
+            partner_title=partner_name,
+            is_group=self.is_group_chat
         )
         if new_reply:
             self.after(0, self.show_pending_reply, new_reply)
@@ -775,8 +831,16 @@ class MessengerAgentGUI(ctk.CTk):
                 self.config = self.load_config()
                 cid = chosen["id"]
                 name = chosen["partner_name"]
-                self.lbl_current_conv.configure(text=f"🏷️ [{cid}] {name}")
-                self.log(f"Đã chuyển sang cuộc hội thoại: [{cid}] {name}")
+                is_grp = bool(chosen.get("is_group", self.config.get("conversation", {}).get("is_group", False)))
+                self.is_group_chat = is_grp
+                if self.is_group_chat:
+                    self.switch_group_chat.select()
+                else:
+                    self.switch_group_chat.deselect()
+
+                grp_tag = " [Group]" if self.is_group_chat else ""
+                self.lbl_current_conv.configure(text=f"🏷️ [{cid}] {name}{grp_tag}")
+                self.log(f"Đã chuyển sang cuộc hội thoại: [{cid}] {name}{grp_tag}")
 
                 # Tải lại danh sách memories của cuộc hội thoại này
                 active_mems = self.mysql.get_active_memories(cid)
@@ -799,8 +863,16 @@ class MessengerAgentGUI(ctk.CTk):
         if chosen_conv:
             cid = chosen_conv["id"]
             name = chosen_conv["partner_name"]
-            self.lbl_current_conv.configure(text=f"🏷️ [{cid}] {name}")
-            self.log(f"Đã chọn cuộc hội thoại: [{cid}] {name}")
+            is_grp = bool(chosen_conv.get("is_group", self.config.get("conversation", {}).get("is_group", False)))
+            self.is_group_chat = is_grp
+            if self.is_group_chat:
+                self.switch_group_chat.select()
+            else:
+                self.switch_group_chat.deselect()
+
+            grp_tag = " [Group]" if self.is_group_chat else ""
+            self.lbl_current_conv.configure(text=f"🏷️ [{cid}] {name}{grp_tag}")
+            self.log(f"Đã chọn cuộc hội thoại: [{cid}] {name}{grp_tag}")
         else:
             # Tự động mở hộp thoại chọn hoặc tạo cuộc hội thoại ngay sau khi snip xong
             self.after(200, self.open_conversation_dialog)

@@ -67,10 +67,18 @@ class MySQLClient:
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         conversation_id VARCHAR(100) NOT NULL UNIQUE,
                         partner_name VARCHAR(255) DEFAULT 'Người quen',
+                        is_group BOOLEAN DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                     );
                 """)
+                # Tự động thêm cột is_group nếu database đã tồn tại từ trước
+                cursor.execute("""
+                    SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'conversations' AND COLUMN_NAME = 'is_group';
+                """, (self.database,))
+                if cursor.fetchone().get("cnt", 0) == 0:
+                    cursor.execute("ALTER TABLE conversations ADD COLUMN is_group BOOLEAN DEFAULT FALSE;")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS chat_history (
                         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -100,21 +108,60 @@ class MySQLClient:
         except Exception as e:
             print(f"[MySQL - CẢNH BÁO] Chưa thể kết nối MySQL tại {self.host}:{self.port} ({e}).")
 
-    def ensure_conversation(self, conversation_id: str, partner_name: str = "Người quen"):
+    def ensure_conversation(self, conversation_id: str, partner_name: str = "Người quen", is_group: Optional[bool] = None):
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cursor:
+                if is_group is not None:
+                    cursor.execute(
+                        """
+                        INSERT INTO conversations (conversation_id, partner_name, is_group)
+                        VALUES (%s, %s, %s)
+                        ON DUPLICATE KEY UPDATE partner_name = VALUES(partner_name), is_group = VALUES(is_group), updated_at = NOW();
+                        """,
+                        (conversation_id, partner_name, is_group)
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO conversations (conversation_id, partner_name)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE partner_name = VALUES(partner_name), updated_at = NOW();
+                        """,
+                        (conversation_id, partner_name)
+                    )
+            conn.close()
+        except Exception as e:
+            print(f"[MySQL Error] ensure_conversation: {e}")
+
+    def update_conversation_group(self, conversation_id: str, is_group: bool):
+        """Cập nhật trạng thái group chat cho cuộc hội thoại"""
         try:
             conn = self._get_connection()
             with conn.cursor() as cursor:
                 cursor.execute(
-                    """
-                    INSERT INTO conversations (conversation_id, partner_name)
-                    VALUES (%s, %s)
-                    ON DUPLICATE KEY UPDATE partner_name = VALUES(partner_name), updated_at = NOW();
-                    """,
-                    (conversation_id, partner_name)
+                    "UPDATE conversations SET is_group = %s, updated_at = NOW() WHERE conversation_id = %s;",
+                    (is_group, conversation_id)
                 )
             conn.close()
         except Exception as e:
-            print(f"[MySQL Error] ensure_conversation: {e}")
+            print(f"[MySQL Error] update_conversation_group: {e}")
+
+    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """Lấy thông tin chi tiết của 1 cuộc hội thoại"""
+        try:
+            conn = self._get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT conversation_id, partner_name, is_group FROM conversations WHERE conversation_id = %s LIMIT 1;",
+                    (conversation_id,)
+                )
+                res = cursor.fetchone()
+            conn.close()
+            return res
+        except Exception as e:
+            print(f"[MySQL Error] get_conversation: {e}")
+            return None
 
     def add_chat_message(self, conversation_id: str, sender: str, content: str):
         try:
@@ -203,6 +250,7 @@ class MySQLClient:
                     SELECT 
                         c.conversation_id, 
                         c.partner_name, 
+                        COALESCE(c.is_group, FALSE) AS is_group,
                         c.updated_at,
                         (SELECT COUNT(*) FROM chat_history WHERE conversation_id = c.conversation_id) AS msg_count,
                         (SELECT COUNT(*) FROM memories WHERE conversation_id = c.conversation_id AND status = 'active') AS mem_count
