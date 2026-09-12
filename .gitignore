@@ -1,0 +1,89 @@
+# ==============================================================================
+# BẢO MẬT & BIẾN MÔI TRƯỜNG
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# ==============================================================================
+# PYTHON ARTIFACTS
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ==============================================================================
+# MÔI TRƯỜNG ẢO (VIRTUAL ENVIRONMENTS)
+# ==============================================================================
+venv/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# DỮ LIỆU TẠM & ẢNH DEBUG KIỂM CHỨNG
+# ==============================================================================
+debug_calibration.png
+debug_*.png
+*.png.tmp
+*.tmp
+*.log
+bot.pid
+scratch/
+
+# ==============================================================================
+# DOCKER VOLUMES & CƠ SỞ DỮ LIỆU CỤC BỘ
+# ==============================================================================
+mysql_data/
+qdrant_storage/
+*.sqlite
+*.sqlite3
+*.db
+
+# Dữ liệu giả lập không dùng
+data/*.json
+!data/.gitkeep
+
+# ==============================================================================
+# HỆ ĐIỀU HÀNH & IDE
+# ==============================================================================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code / JetBrains / Cursor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

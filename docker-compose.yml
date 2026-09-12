@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu quan hệ MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: messenger_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: messenger_bot
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - messenger_net
+
+  # 2. Cơ sở dữ liệu Vector Qdrant
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: messenger_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - messenger_net
+
+volumes:
+  mysql_data:
+    name: messenger_mysql_data
+  qdrant_data:
+    name: messenger_qdrant_data
+
+networks:
+  messenger_net:
+    name: messenger_network
+    driver: bridge
